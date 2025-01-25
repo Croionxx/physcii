@@ -95,14 +95,14 @@ void updatePosition(sprites& sprite, std::vector<sprites>& sprites_list, int wid
 // Function to draw a shape
 void drawShape(const sprites& sprite) {
     if (sprite.shape_properties.type == SQUARE) {
-        // Draw square
+        // Draw square with horizontal spacing
         for (int row = 0; row < sprite.shape_properties.size; row++) {
             for (int col = 0; col < sprite.shape_properties.size; col++) {
-                mvaddch(int(sprite.pos_y) + row, int(sprite.pos_x) + col, sprite.shape_properties.name);
+                mvaddch(int(sprite.pos_y) + row, int(sprite.pos_x) + 2 * col, sprite.shape_properties.name);
             }
         }
     } else if (sprite.shape_properties.type == CIRCLE) {
-        // Draw circle (approximation using midpoint algorithm)
+        // Draw circle (approximation using midpoint algorithm) with horizontal spacing
         int radius = sprite.shape_properties.size / 2;
         int center_x = sprite.pos_x + radius;
         int center_y = sprite.pos_y + radius;
@@ -110,12 +110,13 @@ void drawShape(const sprites& sprite) {
         for (int y = -radius; y <= radius; y++) {
             for (int x = -radius; x <= radius; x++) {
                 if (x * x + y * y <= radius * radius) {
-                    mvaddch(center_y + y, center_x + x, sprite.shape_properties.name);
+                    mvaddch(center_y + y, center_x + 2 * x, sprite.shape_properties.name);
                 }
             }
         }
     }
 }
+
 
 int main() {
     double coe = 0.8;       // Coefficient of restitution
