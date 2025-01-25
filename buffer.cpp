@@ -1,52 +1,69 @@
 #include <ncurses.h>
 #include <vector>
-#include <utility>
 #include <unistd.h> 
 #include <sys/ioctl.h>
 #include <cmath>
+#include <cstdlib>
 
-struct Vector2D {
-    double x;
-    double y;
+struct sprite_rectangle {
+    int vel_x;
+    int vel_y;
+    double pos_x;
+    double pos_y;
+    int size;
+    char name;
 };
 
-Vector2D calculateNewPosition(const Vector2D& initialPosition, 
-                              const Vector2D& initialVelocity, 
-                              const Vector2D& acceleration, 
-                              double time) {
-    Vector2D newPosition;
-    newPosition.x = initialPosition.x + initialVelocity.x * time + 
-                    0.5 * acceleration.x * time * time;
-    newPosition.y = initialPosition.y + initialVelocity.y * time + 
-                    0.5 * acceleration.y * time * time;
-    return newPosition;
+void updatePosition(sprite_rectangle& sprite, int width, int height, double coe) {
+    sprite.pos_x += sprite.vel_x;
+    sprite.pos_y += sprite.vel_y;
+
+    // Handle collisions with screen boundaries
+    if (sprite.pos_x <= 1 || sprite.pos_x + sprite.size >= width - 1) {
+        sprite.vel_x = -coe * sprite.vel_x; 
+        sprite.pos_x = fmax(1, fmin(sprite.pos_x, width - sprite.size - 1));
+    }
+    if (sprite.pos_y <= 1 || sprite.pos_y + sprite.size >= height - 1) {
+        sprite.vel_y = -coe * sprite.vel_y; 
+        sprite.pos_y = fmax(1, fmin(sprite.pos_y, height - sprite.size - 1));
+    }
 }
 
 int main() {
+
+    int coe = 1;
+
     initscr();
     cbreak();
     noecho();
     curs_set(0);
-    nodelay(stdscr, TRUE);  
+    nodelay(stdscr, TRUE);
 
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
     int width  = w.ws_col;
     int height = w.ws_row;
+    int delayUs = 50000; 
 
-    int squareSize = 1;
-    int delayUs = 10000;  // Reduced delay for smoother animation
+    
+    std::vector<sprite_rectangle> sprites;
 
-    Vector2D position = {10.0, 10.0};
-    Vector2D velocity = {5.0, 3.0};
-    Vector2D acceleration = {0.1, -0.1};
-    double timeStep = 0.1;
+    for (int i = 0; i < 100; i++) {
+        sprite_rectangle sprite;
+        sprite.pos_x = rand() % (width - 6) + 1;
+        sprite.pos_y = rand() % (height - 6) + 1;
+        sprite.vel_x = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+        sprite.vel_y = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+        sprite.size = 2;
+        sprite.name = '#';
+        sprites.push_back(sprite);
+    }
 
     while (true) {
         clear();
 
-        // Draw border
+        // Draw screen boundaries
         for (int x = 0; x < width; x++) {
             mvaddch(0, x, '-');
             mvaddch(height - 1, x, '-');
@@ -56,24 +73,20 @@ int main() {
             mvaddch(y, width - 1, '|');
         }
 
-        // Calculate new position
-        position = calculateNewPosition(position, velocity, acceleration, timeStep);
+        // draw all sprites
+        for (auto& sprite : sprites) {
+            updatePosition(sprite, width, height, coe);
 
-        // Ensure the square stays within the screen bounds
-        position.x = fmax(1, fmin(position.x, width - squareSize - 1));
-        position.y = fmax(1, fmin(position.y, height - squareSize - 1));
-
-        // Draw square
-        for (int row = 0; row < squareSize; row++) {
-            for (int col = 0; col < squareSize; col++) {
-                mvaddch(int(position.y) + row, int(position.x) + col, '#');
+            for (int row = 0; row < sprite.size; row++) {
+                for (int col = 0; col < sprite.size; col++) {
+                    mvaddch(int(sprite.pos_y) + row, int(sprite.pos_x) + col, sprite.name);
+                }
             }
         }
 
         refresh();
         usleep(delayUs);
 
-        // Check for 'q' key press
         int ch = getch();
         if (ch == 'q' || ch == 'Q') {
             break;
