@@ -14,11 +14,12 @@ struct sprite_rectangle {
     char name;
 };
 
-void updatePosition(sprite_rectangle& sprite, int width, int height, double coe) {
+void updatePosition(sprite_rectangle& sprite, int width, int height, double coe, double gravity) {
+    sprite.vel_y += gravity;
+
     sprite.pos_x += sprite.vel_x;
     sprite.pos_y += sprite.vel_y;
 
-    // Handle collisions with screen boundaries
     if (sprite.pos_x <= 1 || sprite.pos_x + sprite.size >= width - 1) {
         sprite.vel_x = -coe * sprite.vel_x; 
         sprite.pos_x = fmax(1, fmin(sprite.pos_x, width - sprite.size - 1));
@@ -30,8 +31,8 @@ void updatePosition(sprite_rectangle& sprite, int width, int height, double coe)
 }
 
 int main() {
-
-    int coe = 1;
+    double coe = 1;       // coefficient of restitution
+    double gravity = 1.0;   // gravity
 
     initscr();
     cbreak();
@@ -46,9 +47,9 @@ int main() {
     int height = w.ws_row;
     int delayUs = 50000; 
 
-    
     std::vector<sprite_rectangle> sprites;
 
+    // Create sprites
     for (int i = 0; i < 100; i++) {
         sprite_rectangle sprite;
         sprite.pos_x = rand() % (width - 6) + 1;
@@ -63,7 +64,6 @@ int main() {
     while (true) {
         clear();
 
-        // Draw screen boundaries
         for (int x = 0; x < width; x++) {
             mvaddch(0, x, '-');
             mvaddch(height - 1, x, '-');
@@ -73,9 +73,8 @@ int main() {
             mvaddch(y, width - 1, '|');
         }
 
-        // draw all sprites
         for (auto& sprite : sprites) {
-            updatePosition(sprite, width, height, coe);
+            updatePosition(sprite, width, height, coe, gravity);
 
             for (int row = 0; row < sprite.size; row++) {
                 for (int col = 0; col < sprite.size; col++) {
