@@ -12,6 +12,7 @@
 #include <sys/stat.h> 
 #include <algorithm> 
 #include <thread> 
+#include <memory>
 
 struct sprite_rectangle {
     int vel_x;
@@ -36,7 +37,7 @@ void updatePosition(sprite_rectangle& sprite, int width, int height, double coe)
     }
 }
 
-void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, const std::string& fifo_path) {
+void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, std::shared_ptr<double> coe, const std::string& fifo_path) {
     int fd = open(fifo_path.c_str(), O_RDONLY);
     char buffer[256];
 
@@ -69,6 +70,10 @@ void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, const 
                 iss >> param;
                 if (param == "gravity") {
                     iss >> gravity;
+                } else if (param == "coe") {
+                    double new_coe;
+                    iss >> new_coe;
+                    *coe = new_coe;
                 }
             }
         }
@@ -80,7 +85,7 @@ int main() {
     mkfifo(fifo_path.c_str(), 0666);
 
     int gravity = 1;
-    int coe = 1;
+    auto coe = std::make_shared<double>(1.0);
 
     initscr();
     cbreak();
@@ -97,7 +102,7 @@ int main() {
 
     std::vector<sprite_rectangle> sprites;
 
-    std::thread command_thread(handleCommands, std::ref(sprites), std::ref(gravity), std::ref(fifo_path));
+    std::thread command_thread(handleCommands, std::ref(sprites), std::ref(gravity), coe, fifo_path);
 
     while (true) {
         clear();
@@ -114,7 +119,7 @@ int main() {
         for (auto& sprite : sprites) {
             sprite.vel_y += gravity;
 
-            updatePosition(sprite, width, height, coe);
+            updatePosition(sprite, width, height, *coe);
 
             for (int row = 0; row < sprite.size; row++) {
                 for (int col = 0; col < sprite.size; col++) {
