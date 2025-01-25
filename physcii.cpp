@@ -103,6 +103,24 @@ void handleCommands(std::vector<Sprite>& sprites, int& gravity, std::shared_ptr<
                     iss >> new_coe;
                     *coe = new_coe;
                 }
+            } else if (command == "random") {
+                int count;
+                iss >> count;
+                for (int i = 0; i < count; ++i) {
+                    char name = 'A' + (rand() % 26);
+                    int size = rand() % 5 + 3;
+                    int x = rand() % (80 - size - 1) + 1;
+                    int y = rand() % (24 - size - 1) + 1;
+                    int vx = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+                    int vy = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+                    char shapeType = (rand() % 2 == 0) ? 'C' : 'S';
+
+                    Sprite new_sprite = {vx, vy, static_cast<double>(x), static_cast<double>(y), size, name, (shapeType == 'C' ? CIRCLE : SQUARE)};
+                    sprites.push_back(new_sprite);
+                }
+            }
+            else if (command == "clear") {
+                sprites.clear();
             }
         }
     }
