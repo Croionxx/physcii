@@ -1,29 +1,50 @@
-#include <iostream>
-#include <fstream>
+#include <ncurses.h>
 #include <vector>
-#include <string>
-#include <sstream>
 #include <unistd.h>
-#include <fcntl.h>
+#include <sys/ioctl.h>
 #include <cmath>
 #include <cstdlib>
-#include <ncurses.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h> 
-#include <algorithm> 
-#include <thread> 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <algorithm>
+#include <thread>
 #include <memory>
 
-struct sprite_rectangle {
+enum ShapeType {
+    SQUARE,
+    CIRCLE
+};
+
+struct Sprite {
     int vel_x;
     int vel_y;
     double pos_x;
     double pos_y;
     int size;
     char name;
+    ShapeType type;
 };
 
-void updatePosition(sprite_rectangle& sprite, int width, int height, double coe) {
+bool checkCollision(const Sprite& sprite1, const Sprite& sprite2) {
+    bool isOverlappingX = sprite1.pos_x < sprite2.pos_x + sprite2.size &&
+                          sprite1.pos_x + sprite1.size > sprite2.pos_x;
+    bool isOverlappingY = sprite1.pos_y < sprite2.pos_y + sprite2.size &&
+                          sprite1.pos_y + sprite1.size > sprite2.pos_y;
+    return isOverlappingX && isOverlappingY;
+}
+
+void resolveCollision(Sprite& sprite1, Sprite& sprite2) {
+    std::swap(sprite1.vel_x, sprite2.vel_x);
+    std::swap(sprite1.vel_y, sprite2.vel_y);
+}
+
+void updatePosition(Sprite& sprite, std::vector<Sprite>& sprites, int width, int height, double coe, double gravity) {
+    sprite.vel_y += gravity;
+
     sprite.pos_x += sprite.vel_x;
     sprite.pos_y += sprite.vel_y;
 
@@ -35,9 +56,15 @@ void updatePosition(sprite_rectangle& sprite, int width, int height, double coe)
         sprite.vel_y = -coe * sprite.vel_y;
         sprite.pos_y = fmax(1, fmin(sprite.pos_y, height - sprite.size - 1));
     }
+
+    for (auto& other : sprites) {
+        if (&sprite != &other && checkCollision(sprite, other)) {
+            resolveCollision(sprite, other);
+        }
+    }
 }
 
-void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, std::shared_ptr<double> coe, const std::string& fifo_path) {
+void handleCommands(std::vector<Sprite>& sprites, int& gravity, std::shared_ptr<double> coe, const std::string& fifo_path) {
     int fd = open(fifo_path.c_str(), O_RDONLY);
     char buffer[256];
 
@@ -51,17 +78,18 @@ void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, std::s
 
             if (command == "add") {
                 std::string name;
-                int x, y, vx, vy;
-                iss >> name >> x >> y >> vx >> vy;
+                int x, y, vx, vy, size;
+                char shapeType;
+                iss >> shapeType >> name >> x >> y >> vx >> vy >> size;
 
-                sprite_rectangle new_sprite = {vx, vy, static_cast<double>(x), static_cast<double>(y), 2, name[0]};
+                Sprite new_sprite = {vx, vy, static_cast<double>(x), static_cast<double>(y), size, name[0], (shapeType == 'C' ? CIRCLE : (shapeType == 'S' ? SQUARE : throw std::invalid_argument("Invalid shape type")))};
                 sprites.push_back(new_sprite);
             } else if (command == "remove") {
                 std::string name;
                 iss >> name;
 
                 sprites.erase(std::remove_if(sprites.begin(), sprites.end(),
-                              [&name](const sprite_rectangle& sprite) {
+                              [&name](const Sprite& sprite) {
                                   return sprite.name == name[0];
                               }),
                               sprites.end());
@@ -74,6 +102,28 @@ void handleCommands(std::vector<sprite_rectangle>& sprites, int& gravity, std::s
                     double new_coe;
                     iss >> new_coe;
                     *coe = new_coe;
+                }
+            }
+        }
+    }
+}
+
+void drawShape(const Sprite& sprite) {
+    if (sprite.type == SQUARE) {
+        for (int row = 0; row < sprite.size; row++) {
+            for (int col = 0; col < sprite.size; col++) {
+                mvaddch(static_cast<int>(sprite.pos_y) + row, static_cast<int>(sprite.pos_x) + col, sprite.name);
+            }
+        }
+    } else if (sprite.type == CIRCLE) {
+        int radius = sprite.size / 2;
+        int center_x = sprite.pos_x + radius;
+        int center_y = sprite.pos_y + radius;
+
+        for (int y = -radius; y <= radius; y++) {
+            for (int x = -radius; x <= radius; x++) {
+                if (x * x + y * y <= radius * radius) {
+                    mvaddch(center_y + y, center_x + x, sprite.name);
                 }
             }
         }
@@ -100,7 +150,7 @@ int main() {
     int height = w.ws_row;
     int delayUs = 50000;
 
-    std::vector<sprite_rectangle> sprites;
+    std::vector<Sprite> sprites;
 
     std::thread command_thread(handleCommands, std::ref(sprites), std::ref(gravity), coe, fifo_path);
 
@@ -117,15 +167,8 @@ int main() {
         }
 
         for (auto& sprite : sprites) {
-            sprite.vel_y += gravity;
-
-            updatePosition(sprite, width, height, *coe);
-
-            for (int row = 0; row < sprite.size; row++) {
-                for (int col = 0; col < sprite.size; col++) {
-                    mvaddch(static_cast<int>(sprite.pos_y) + row, static_cast<int>(sprite.pos_x) + col, sprite.name);
-                }
-            }
+            updatePosition(sprite, sprites, width, height, *coe, gravity);
+            drawShape(sprite);
         }
 
         refresh();
