@@ -80,7 +80,7 @@ void handleCommands(std::vector<Sprite>& sprites, int& gravity, std::shared_ptr<
                 std::string name;
                 int x, y, vx, vy, size;
                 char shapeType;
-                iss >> shapeType >> name >> x >> y >> vx >> vy >> size;
+                iss >> shapeType >> name >> size >> x >> y >> vx >> vy; 
 
                 Sprite new_sprite = {vx, vy, static_cast<double>(x), static_cast<double>(y), size, name[0], (shapeType == 'C' ? CIRCLE : (shapeType == 'S' ? SQUARE : throw std::invalid_argument("Invalid shape type")))};
                 sprites.push_back(new_sprite);
