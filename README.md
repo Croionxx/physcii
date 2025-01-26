@@ -3,7 +3,7 @@
 
 ### To Run
 ```sh
-g++ buffer1.cpp -o buffer1 -lncurses -pthread
+g++ physcii.cpp -o phsycii -lncurses -pthread
 ```
 
 ### Commands to control
