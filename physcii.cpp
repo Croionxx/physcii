@@ -42,12 +42,50 @@ void resolveCollision(Sprite& sprite1, Sprite& sprite2) {
     std::swap(sprite1.vel_y, sprite2.vel_y);
 }
 
+// Helper function to apply a repulsive force between two sprites
+void applyRepulsiveForce(Sprite& sprite1, Sprite& sprite2) {
+    // Calculate the distance between the centers of the two sprites
+    double center1_x = sprite1.pos_x + sprite1.size / 2.0;
+    double center1_y = sprite1.pos_y + sprite1.size / 2.0;
+    double center2_x = sprite2.pos_x + sprite2.size / 2.0;
+    double center2_y = sprite2.pos_y + sprite2.size / 2.0;
+
+    double dx = center2_x - center1_x;
+    double dy = center2_y - center1_y;
+    double distance = sqrt(dx * dx + dy * dy);
+
+    // If the sprites overlap, calculate and apply a repulsive force
+    double minDistance = (sprite1.size + sprite2.size) / 2.0;
+    if (distance < minDistance) {
+        double overlap = minDistance - distance;
+
+        // Normalize the direction vector
+        dx /= distance;
+        dy /= distance;
+
+        // Apply a repulsive force proportional to the overlap
+        double force = overlap * 0.5; // Adjust the factor as needed for more or less repulsion
+        sprite1.vel_x -= force * dx;
+        sprite1.vel_y -= force * dy;
+        sprite2.vel_x += force * dx;
+        sprite2.vel_y += force * dy;
+
+        // Adjust positions slightly to separate the sprites
+        sprite1.pos_x -= force * dx / 2.0;
+        sprite1.pos_y -= force * dy / 2.0;
+        sprite2.pos_x += force * dx / 2.0;
+        sprite2.pos_y += force * dy / 2.0;
+    }
+}
+
+// Update function with central forces added
 void updatePosition(Sprite& sprite, std::vector<Sprite>& sprites, int width, int height, double coe, double gravity) {
     sprite.vel_y += gravity;
 
     sprite.pos_x += sprite.vel_x;
     sprite.pos_y += sprite.vel_y;
 
+    // Handle collisions with boundaries
     if (sprite.pos_x <= 1 || sprite.pos_x + sprite.size >= width - 1) {
         sprite.vel_x = -coe * sprite.vel_x;
         sprite.pos_x = fmax(1, fmin(sprite.pos_x, width - sprite.size - 1));
@@ -57,13 +95,14 @@ void updatePosition(Sprite& sprite, std::vector<Sprite>& sprites, int width, int
         sprite.pos_y = fmax(1, fmin(sprite.pos_y, height - sprite.size - 1));
     }
 
+    // Check for collisions and apply central forces
     for (auto& other : sprites) {
         if (&sprite != &other && checkCollision(sprite, other)) {
             resolveCollision(sprite, other);
+            applyRepulsiveForce(sprite, other);
         }
     }
 }
-
 void handleCommands(std::vector<Sprite>& sprites, int& gravity, std::shared_ptr<double> coe, const std::string& fifo_path) {
     int fd = open(fifo_path.c_str(), O_RDONLY);
     char buffer[256];
